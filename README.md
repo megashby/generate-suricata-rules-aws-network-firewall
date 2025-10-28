@@ -1,0 +1,1 @@
+# generate-suricata-rules-aws-network-firewall
