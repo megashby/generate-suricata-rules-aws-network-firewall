@@ -9,9 +9,9 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
 
         for row in reader:
             domain = row['domain'].strip()
-            action = row['action'].strip().lower()
-            log_flag = row['log'].strip()
-            protocol = (row.get('protocol') or '').strip().lower()
+            action = (row.get('action', 'pass')).strip().lower()
+            log_flag = (row.get('log', '1')).strip()
+            protocol = (row.get('protocol','tls')).strip().lower()
 
             if not domain:
                 print("Skipping row with no domain.")
