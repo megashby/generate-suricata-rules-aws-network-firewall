@@ -1,0 +1,4 @@
+alert dns any any -> any any (msg:"LOG traffic for domain example.com"; dns.query; content:"example.com"; nocase; sid:1; rev:1;)
+drop dns any any -> any any (msg:"DROP traffic for domain example.com"; dns.query; content:"example.com"; nocase; sid:2; rev:1;)
+alert dns any any -> any any (msg:"LOG traffic for domain test.org"; dns.query; content:"test.org"; nocase; sid:3; rev:1;)
+pass dns any any -> any any (msg:"PASS traffic for domain test.org"; dns.query; content:"test.org"; nocase; sid:4; rev:1;)

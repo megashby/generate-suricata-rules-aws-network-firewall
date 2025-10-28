@@ -1,0 +1,3 @@
+domain,action,log
+example.com,drop,1
+test.org,,
