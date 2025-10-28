@@ -59,7 +59,7 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
             if log_flag in ('1'):
                 alert_rule = (
                     f'alert {protocol} any any -> any any '
-                    f'(msg:"LOG traffic for {fqdn} via {protocol.upper()}"; '
+                    f'(msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()}"; '
                     f'{content_rule} sid:{sid}; rev:1;)'
                 )
                 rules.append(alert_rule)
