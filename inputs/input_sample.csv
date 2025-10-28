@@ -1,3 +1,5 @@
-domain,action,protocol,log
-example.com,drop,tls,1
-test.org,pass,http,0
+domain,subdomain,action,protocol,log
+example.com,,drop,tls,1
+test.org,pass,,http,0
+test.com,badsubdomain,drop,,1
+test.com,*,,,0
