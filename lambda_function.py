@@ -9,6 +9,7 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
 
         for row in reader:
             domain = row['domain'].strip()
+            subdomains_input = (row.get('subdomain') or '').strip().lower()
             action = (row.get('action', 'pass')).strip().lower()
             log_flag = (row.get('log', '1')).strip()
             protocol = (row.get('protocol','tls')).strip().lower()
@@ -30,23 +31,36 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
                 print(f"Defaulting protocol to 'tls' for domain '{domain}' (was '{protocol}')")
                 protocol = 'tls'
 
+            # Split multiple subdomains
+            subdomains = [s.strip() for s in subdomains_input.replace(',', ';').split(';') if s.strip()]
+            if not subdomains:
+                subdomains = ['none']
+
+            # Generate rules for each subdomain
+            for sub in subdomains:
+                if sub.lower() == 'none':
+                    fqdn = domain
+                elif sub == '*':
+                    fqdn = f".{domain}"  # Suricata style for wildcard
+                else:
+                    fqdn = f"{sub}.{domain}"    
+
             if protocol == 'dns':
-                content_rule = f'dns.query; content:"{domain}"; nocase;'
+                content_rule = f'dns.query; content:"{fqdn}"; nocase;'
             elif protocol == 'tls':
-                content_rule = f'tls.sni; content:"{domain}"; nocase;'
+                content_rule = f'tls.sni; content:"{fqdn}"; nocase;'
             elif protocol == 'http':
-                content_rule = f'http.host; content:"{domain}"; '
+                content_rule = f'http.host; content:"{fqdn}"; '
             else:
                 # Fallback generic content match (rarely used, but safe)
-                content_rule = f'content:"{domain}"; nocase;'       
+                content_rule = f'content:"{fqdn}"; nocase;'       
 
             # If log == 1, add an alert rule first
             if log_flag in ('1'):
                 alert_rule = (
-                    f'alert dns any any -> any any '
-                    f'(msg:"LOG traffic for domain {domain}"; '
-                    f'dns.query; content:"{domain}"; nocase; '
-                    f'sid:{sid}; rev:1;)'
+                    f'alert {protocol} any any -> any any '
+                    f'(msg:"LOG traffic for {fqdn} via {protocol.upper()}"; '
+                    f'{content_rule} sid:{sid}; rev:1;)'
                 )
                 rules.append(alert_rule)
                 sid += 1
