@@ -40,41 +40,45 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
             for sub in subdomains:
                 if sub.lower() == 'none':
                     fqdn = domain
+                    content_rule_extra = 'startswith; endswith;'
                 elif sub == '*':
                     fqdn = f".{domain}"  # Suricata style for wildcard
+                    content_rule_extra = ''  # wildcard, no exact match
                 else:
-                    fqdn = f"{sub}.{domain}"    
+                    fqdn = f"{sub}.{domain}"
+                    content_rule_extra = 'startswith; endswith;'
 
-            if protocol == 'dns':
-                content_rule = f'dns.query; content:"{fqdn}"; nocase;'
-            elif protocol == 'tls':
-                content_rule = f'tls.sni; content:"{fqdn}"; nocase;'
-            elif protocol == 'http':
-                content_rule = f'http.host; content:"{fqdn}"; '
-            else:
-                # Fallback generic content match (rarely used, but safe)
-                content_rule = f'content:"{fqdn}"; nocase;'
+                # Build content rule
+                if protocol == 'dns':
+                    content_rule = f'dns.query; content:"{fqdn}"; {content_rule_extra} nocase;'
+                elif protocol == 'tls':
+                    content_rule = f'tls.sni; content:"{fqdn}"; {content_rule_extra} nocase;'
+                elif protocol == 'http':
+                    # HTTP does not support nocase
+                    content_rule = f'http.host; content:"{fqdn}"; {content_rule_extra}'
+                else:
+                    content_rule = f'content:"{fqdn}"; {content_rule_extra} nocase;'
 
-            flow_rule = 'flow:to_server;'           
+                flow_rule = 'flow:to_server;'
 
-            # If log == 1, add an alert rule first
-            if log_flag in ('1'):
-                alert_rule = (
-                    f'alert {protocol} $HOME_NET any -> $EXTERNAL_NET any '
-                    f'({flow_rule} msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()} (logged)"; '
+                # If log == 1, add an alert rule first
+                if log_flag == '1':
+                    alert_rule = (
+                        f'alert {protocol} $HOME_NET any -> $EXTERNAL_NET any '
+                        f'({flow_rule} msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()} (logged)"; '
+                        f'{content_rule} sid:{sid}; rev:1;)'
+                    )
+                    rules.append(alert_rule)
+                    sid += 1
+
+                # Then add the main pass/drop rule
+                rule = (
+                    f'{action} {protocol} $HOME_NET any -> $EXTERNAL_NET any '
+                    f'({flow_rule} msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()}"; '
                     f'{content_rule} sid:{sid}; rev:1;)'
                 )
-                rules.append(alert_rule)
+                rules.append(rule)
                 sid += 1
-
-            # Then add the main pass/drop rule
-            rule = (
-                f'{action} {protocol} $HOME_NET any -> $EXTERNAL_NET any '
-                f'({flow_rule} msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()}"; '
-                f'{content_rule} sid:{sid}; rev:1;)'
-            )
-            rules.append(rule)
-            sid += 1
 
     # Write all generated rules to file
     with open(output_file, 'w', encoding='utf-8') as f:
@@ -84,4 +88,5 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
 
 def main():
     generate_suricata_rules("inputs/input_sample.csv")
-main()    
+
+main()
