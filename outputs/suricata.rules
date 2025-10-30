@@ -1,6 +1,6 @@
 alert tls $HOME_NET any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for example.com via TLS (logged)"; tls.sni; content:"example.com"; startswith; endswith; nocase; sid:1; rev:1;)
 drop tls $HOME_NET any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for example.com via TLS"; tls.sni; content:"example.com"; startswith; endswith; nocase; sid:2; rev:1;)
-pass http $HOME_NET any -> $EXTERNAL_NET any (flow:to_server; msg:"PASS traffic for pass.test.org via HTTP"; http.host; content:"pass.test.org"; startswith; endswith; sid:3; rev:1;)
+pass http $HOME_NET any -> $EXTERNAL_NET any (flow:to_server; msg:"PASS traffic for test.org via HTTP"; http.host; content:"test.org"; startswith; endswith; sid:3; rev:1;)
 alert tls $HOME_NET any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for badsubdomain.test.com via TLS (logged)"; tls.sni; content:"badsubdomain.test.com"; startswith; endswith; nocase; sid:4; rev:1;)
 drop tls $HOME_NET any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for badsubdomain.test.com via TLS"; tls.sni; content:"badsubdomain.test.com"; startswith; endswith; nocase; sid:5; rev:1;)
 pass tls $HOME_NET any -> $EXTERNAL_NET any (flow:to_server; msg:"PASS traffic for .test.com via TLS"; tls.sni; content:".test.com"; endswith; nocase; sid:6; rev:1;)
