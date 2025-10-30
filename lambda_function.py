@@ -53,13 +53,15 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
                 content_rule = f'http.host; content:"{fqdn}"; '
             else:
                 # Fallback generic content match (rarely used, but safe)
-                content_rule = f'content:"{fqdn}"; nocase;'       
+                content_rule = f'content:"{fqdn}"; nocase;'
+
+            flow_rule = 'flow:to_server;'           
 
             # If log == 1, add an alert rule first
             if log_flag in ('1'):
                 alert_rule = (
                     f'alert {protocol} $HOME_NET any -> $EXTERNAL_NET any '
-                    f'(msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()} (logged)"; '
+                    f'({flow_rule} msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()} (logged)"; '
                     f'{content_rule} sid:{sid}; rev:1;)'
                 )
                 rules.append(alert_rule)
@@ -68,7 +70,7 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
             # Then add the main pass/drop rule
             rule = (
                 f'{action} {protocol} $HOME_NET any -> $EXTERNAL_NET any '
-                f'(msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()}"; '
+                f'({flow_rule} msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()}"; '
                 f'{content_rule} sid:{sid}; rev:1;)'
             )
             rules.append(rule)
