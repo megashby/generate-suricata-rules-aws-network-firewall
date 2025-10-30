@@ -34,16 +34,17 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
             # Split multiple subdomains
             subdomains = [s.strip() for s in subdomains_input.replace(',', ';').split(';') if s.strip()]
             if not subdomains:
-                subdomains = ['none']
+                # Empty subdomain → exact domain only
+                subdomains = ['']  
 
             # Generate rules for each subdomain
             for sub in subdomains:
-                if sub.lower() == 'none':
+                if sub == '':
                     fqdn = domain
                     content_rule_extra = 'startswith; endswith;'
                 elif sub == '*':
-                    fqdn = f".{domain}"  # Suricata style for wildcard
-                    content_rule_extra = ''  # wildcard, no exact match
+                    fqdn = f".{domain}"  # wildcard
+                    content_rule_extra = 'endswith;'
                 else:
                     fqdn = f"{sub}.{domain}"
                     content_rule_extra = 'startswith; endswith;'
