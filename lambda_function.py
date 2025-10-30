@@ -67,7 +67,7 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
                     alert_rule = (
                         f'alert {protocol} $HOME_NET any -> $EXTERNAL_NET any '
                         f'({flow_rule} msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()} (logged)"; '
-                        f'{content_rule} sid:{sid}; rev:1;)'
+                        f'{content_rule} sid:{sid};)'
                     )
                     rules.append(alert_rule)
                     sid += 1
@@ -76,7 +76,7 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
                 rule = (
                     f'{action} {protocol} $HOME_NET any -> $EXTERNAL_NET any '
                     f'({flow_rule} msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()}"; '
-                    f'{content_rule} sid:{sid}; rev:1;)'
+                    f'{content_rule} sid:{sid};)'
                 )
                 rules.append(rule)
                 sid += 1
