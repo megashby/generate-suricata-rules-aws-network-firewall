@@ -58,8 +58,8 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
             # If log == 1, add an alert rule first
             if log_flag in ('1'):
                 alert_rule = (
-                    f'alert {protocol} any any -> any any '
-                    f'(msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()}"; '
+                    f'alert {protocol} $HOME_NET any -> $EXTERNAL_NET any '
+                    f'(msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()} (logged)"; '
                     f'{content_rule} sid:{sid}; rev:1;)'
                 )
                 rules.append(alert_rule)
@@ -67,8 +67,8 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
 
             # Then add the main pass/drop rule
             rule = (
-                f'{action} {protocol} any any -> any any '
-                f'(msg:"{action.upper()} traffic for domain {domain} via {protocol}"; '
+                f'{action} {protocol} $HOME_NET any -> $EXTERNAL_NET any '
+                f'(msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()}"; '
                 f'{content_rule} sid:{sid}; rev:1;)'
             )
             rules.append(rule)
