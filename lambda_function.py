@@ -43,8 +43,8 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
                     fqdn = domain
                     content_rule_extra = 'startswith; endswith;'
                 elif sub == '*':
-                    fqdn = f".{domain}"  # wildcard
-                    content_rule_extra = 'endswith;'
+                    fqdn = f".{domain}"  # wildcard match for any subdomain
+                    content_rule_extra = 'dotprefix; endswith;'
                 else:
                     fqdn = f"{sub}.{domain}"
                     content_rule_extra = 'startswith; endswith;'
