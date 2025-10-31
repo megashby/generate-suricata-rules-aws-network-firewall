@@ -1,6 +1,7 @@
 domain,subdomain,action,protocol,log
 evil.com,**,drop,"tls;http",1
-nice.com,"evil;bad;",drop,tls,1
+nice.com,"evil;bad;",drop,tls,0
+nice.com,**,pass,tls,1  
 test.org,,pass,http,0
 test.com,badsubdomain,drop,,1
 test.com,*,,,0
