@@ -12,7 +12,7 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
             subdomains_input = (row.get('subdomain') or '').strip().lower()
             action = (row.get('action', 'pass')).strip().lower()
             log_flag = (row.get('log', '1')).strip()
-            protocol = (row.get('protocol','tls')).strip().lower()
+            protocol = (row.get('protocol', 'tls')).strip().lower()
 
             if not domain:
                 print("Skipping row with no domain.")
@@ -20,7 +20,7 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
 
             # Only allow 'pass' or 'drop'
             if action not in ('pass', 'drop'):
-                print(f"{domain}: has no action '{action}', defaulting to pass")
+                print(f"{domain}: has no valid action '{action}', defaulting to pass")
                 action = 'pass'
 
             if log_flag not in ('0', '1'):
@@ -31,31 +31,35 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
                 print(f"Defaulting protocol to 'tls' for domain '{domain}' (was '{protocol}')")
                 protocol = 'tls'
 
-            # Split multiple subdomains
+            # Split multiple subdomains (e.g. "*;sub1;sub2")
             subdomains = [s.strip() for s in subdomains_input.replace(',', ';').split(';') if s.strip()]
+
+            # Handle empty, wildcard, and combined cases
             if not subdomains:
                 # Empty subdomain → exact domain only
-                subdomains = ['']  
+                subdomains = ['']
+            elif '**' in subdomains:
+                # Both the apex and wildcard
+                subdomains = ['', '*']
 
-            # Generate rules for each subdomain
             for sub in subdomains:
                 if sub == '':
                     fqdn = domain
                     content_rule_extra = 'startswith; endswith;'
                 elif sub == '*':
-                    fqdn = f".{domain}"  # wildcard match for any subdomain
+                    fqdn = f".{domain}"  # wildcard for subdomains
                     content_rule_extra = 'dotprefix; endswith;'
                 else:
                     fqdn = f"{sub}.{domain}"
                     content_rule_extra = 'startswith; endswith;'
 
-                # Build content rule
+                # Build content rule based on protocol
                 if protocol == 'dns':
                     content_rule = f'dns.query; content:"{fqdn}"; {content_rule_extra} nocase;'
                 elif protocol == 'tls':
                     content_rule = f'tls.sni; content:"{fqdn}"; {content_rule_extra} nocase;'
                 elif protocol == 'http':
-                    # HTTP does not support nocase
+                    # HTTP host matching is case-sensitive
                     content_rule = f'http.host; content:"{fqdn}"; {content_rule_extra}'
                 else:
                     content_rule = f'content:"{fqdn}"; {content_rule_extra} nocase;'
