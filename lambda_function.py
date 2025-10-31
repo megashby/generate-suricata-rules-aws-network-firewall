@@ -31,17 +31,18 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
                 print(f"Defaulting protocol to 'tls' for domain '{domain}' (was '{protocol}')")
                 protocol = 'tls'
 
-            # Split multiple subdomains (e.g. "*;sub1;sub2")
+            # Split multiple subdomains by comma or semicolon
             subdomains = [s.strip() for s in subdomains_input.replace(',', ';').split(';') if s.strip()]
 
-            # Handle empty, wildcard, and combined cases
+            # Handle special cases
             if not subdomains:
                 # Empty subdomain → exact domain only
                 subdomains = ['']
             elif '**' in subdomains:
-                # Both the apex and wildcard
+                # Both apex and wildcard
                 subdomains = ['', '*']
 
+            # Generate rules for each subdomain entry
             for sub in subdomains:
                 if sub == '':
                     fqdn = domain
