@@ -12,7 +12,7 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
             subdomains_input = (row.get('subdomain') or '').strip().lower()
             action = (row.get('action', 'pass')).strip().lower()
             log_flag = (row.get('log', '1')).strip()
-            protocol = (row.get('protocol', 'tls')).strip().lower()
+            protocols_input = (row.get('protocol', 'tls')).strip().lower()
 
             if not domain:
                 print("Skipping row with no domain.")
@@ -27,9 +27,14 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
                 print(f"Defaulting log=1 for domain '{domain}' (was '{log_flag}')")
                 log_flag = '1'
 
-            if protocol not in ('dns', 'tls', 'http', 'smtp', 'ftp', 'tcp', 'udp'):
-                print(f"Defaulting protocol to 'tls' for domain '{domain}' (was '{protocol}')")
-                protocol = 'tls'
+            # Allow multiple protocols separated by comma or semicolon
+            protocols = [p.strip() for p in protocols_input.replace(',', ';').split(';') if p.strip()]
+            valid_protocols = {'dns', 'tls', 'http', 'smtp', 'ftp', 'tcp', 'udp'}
+
+            # Default to TLS if no valid protocol is given
+            protocols = [p for p in protocols if p in valid_protocols]
+            if not protocols:
+                protocols = ['tls']
 
             # Split multiple subdomains by comma or semicolon
             subdomains = [s.strip() for s in subdomains_input.replace(',', ';').split(';') if s.strip()]
@@ -42,55 +47,60 @@ def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
                 # Both apex and wildcard
                 subdomains = ['', '*']
 
-            # Generate rules for each subdomain entry
-            for sub in subdomains:
-                if sub == '':
-                    fqdn = domain
-                    content_rule_extra = 'startswith; endswith;'
-                elif sub == '*':
-                    fqdn = f".{domain}"  # wildcard for subdomains
-                    content_rule_extra = 'dotprefix; endswith;'
-                else:
-                    fqdn = f"{sub}.{domain}"
-                    content_rule_extra = 'startswith; endswith;'
+            # Remove duplicates safely
+            subdomains = list(dict.fromkeys(subdomains))
+            protocols = list(dict.fromkeys(protocols))
 
-                # Build content rule based on protocol
-                if protocol == 'dns':
-                    content_rule = f'dns.query; content:"{fqdn}"; {content_rule_extra} nocase;'
-                elif protocol == 'tls':
-                    content_rule = f'tls.sni; content:"{fqdn}"; {content_rule_extra} nocase;'
-                elif protocol == 'http':
-                    # HTTP host matching is case-sensitive
-                    content_rule = f'http.host; content:"{fqdn}"; {content_rule_extra}'
-                else:
-                    content_rule = f'content:"{fqdn}"; {content_rule_extra} nocase;'
+            for protocol in protocols:
+                for sub in subdomains:
+                    if sub == '':
+                        fqdn = domain
+                        content_rule_extra = 'startswith; endswith;'
+                    elif sub == '*':
+                        fqdn = f".{domain}"  # wildcard for subdomains
+                        content_rule_extra = 'dotprefix; endswith;'
+                    else:
+                        fqdn = f"{sub}.{domain}"
+                        content_rule_extra = 'startswith; endswith;'
 
-                flow_rule = 'flow:to_server;'
+                    # Build content rule based on protocol
+                    if protocol == 'dns':
+                        content_rule = f'dns.query; content:"{fqdn}"; {content_rule_extra} nocase;'
+                    elif protocol == 'tls':
+                        content_rule = f'tls.sni; content:"{fqdn}"; {content_rule_extra} nocase;'
+                    elif protocol == 'http':
+                        # HTTP host matching is case-sensitive
+                        content_rule = f'http.host; content:"{fqdn}"; {content_rule_extra}'
+                    else:
+                        content_rule = f'content:"{fqdn}"; {content_rule_extra} nocase;'
 
-                # If log == 1, add an alert rule first
-                if log_flag == '1':
-                    alert_rule = (
-                        f'alert {protocol} $HOME_NET any -> $EXTERNAL_NET any '
-                        f'({flow_rule} msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()} (logged)"; '
+                    flow_rule = 'flow:to_server;'
+
+                    # If log == 1, add an alert rule first
+                    if log_flag == '1':
+                        alert_rule = (
+                            f'alert {protocol} $HOME_NET any -> $EXTERNAL_NET any '
+                            f'({flow_rule} msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()} (logged)"; '
+                            f'{content_rule} sid:{sid};)'
+                        )
+                        rules.append(alert_rule)
+                        sid += 1
+
+                    # Then add the main pass/drop rule
+                    rule = (
+                        f'{action} {protocol} $HOME_NET any -> $EXTERNAL_NET any '
+                        f'({flow_rule} msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()}"; '
                         f'{content_rule} sid:{sid};)'
                     )
-                    rules.append(alert_rule)
+                    rules.append(rule)
                     sid += 1
-
-                # Then add the main pass/drop rule
-                rule = (
-                    f'{action} {protocol} $HOME_NET any -> $EXTERNAL_NET any '
-                    f'({flow_rule} msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()}"; '
-                    f'{content_rule} sid:{sid};)'
-                )
-                rules.append(rule)
-                sid += 1
 
     # Write all generated rules to file
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write('\n'.join(rules))
 
     print(f"Generated {len(rules)} rules and saved to {output_file}")
+
 
 def main():
     generate_suricata_rules("inputs/input_sample.csv")
