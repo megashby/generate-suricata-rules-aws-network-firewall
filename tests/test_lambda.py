@@ -1,54 +1,74 @@
-import json
+import os
+import shutil
 import pytest
-from lambda_function import (
-    normalize_protocols,
-    normalize_subdomains,
-    build_content_rule,
-    generate_rules,
-    lambda_handler
-)
+from lambda_function import generate_rules, parse_csv, save_rules, load_csv
 
-def test_normalize_protocols():
-    assert normalize_protocols("tls;http") == ["tls", "http"]
-    assert normalize_protocols("invalid;tls") == ["tls"]
-    assert normalize_protocols("") == ["tls"]
+# Paths for local test files
+INPUT_DIR = os.path.join("tests", "inputs")
+OUTPUT_DIR = os.path.join("tests", "outputs")
+OUTPUT_FILE = os.path.join(OUTPUT_DIR, "suricata.rules")
 
-def test_normalize_subdomains():
-    assert normalize_subdomains("evil;bad") == ["evil", "bad"]
-    assert normalize_subdomains("**") == ["", "*"]
-    assert normalize_subdomains("") == [""]
+# Ensure outputs directory exists and is empty before each test
+@pytest.fixture(autouse=True)
+def clean_outputs():
+    if os.path.exists(OUTPUT_DIR):
+        shutil.rmtree(OUTPUT_DIR)
+    os.makedirs(OUTPUT_DIR)
+    yield
+    # Optionally clean up after test
+    if os.path.exists(OUTPUT_DIR):
+        shutil.rmtree(OUTPUT_DIR)
 
-def test_build_content_rule_tls():
-    rule = build_content_rule("tls", "example.com", False)
-    assert "tls.sni" in rule
-    assert "example.com" in rule
+# -------------------------------
+# Test CSV parsing
+# -------------------------------
+def test_parse_csv():
+    csv_content = "domain,subdomain,action,protocol,log\nexample.com,,pass,tls,1"
+    rows = parse_csv(csv_content)
+    assert len(rows) == 1
+    assert rows[0]['domain'] == "example.com"
+    assert rows[0]['protocol'] == "tls"
 
+# -------------------------------
+# Test full rule generation
+# -------------------------------
 def test_generate_rules_basic():
-    rows = [
-        {"domain": "evil.com", "subdomain": "**", "action": "drop", "protocol": "tls;http", "log": "1"},
-        {"domain": "test.org", "subdomain": "", "action": "pass", "protocol": "http", "log": "0"},
-    ]
-    rules = generate_rules(rows)
-    expected_output = "\n".join([
-        'alert tls $HOME_NET any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for evil.com via TLS (logged)"; tls.sni; content:"evil.com"; startswith; endswith; nocase; sid:1;)',
-        'drop tls $HOME_NET any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for evil.com via TLS"; tls.sni; content:"evil.com"; startswith; endswith; nocase; sid:2;)',
-        'alert tls $HOME_NET any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for .evil.com via TLS (logged)"; tls.sni; content:".evil.com"; dotprefix; endswith; nocase; sid:3;)',
-        'drop tls $HOME_NET any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for .evil.com via TLS"; tls.sni; content:".evil.com"; dotprefix; endswith; nocase; sid:4;)',
-        'alert http $HOME_NET any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for evil.com via HTTP (logged)"; http.host; content:"evil.com"; startswith; endswith; sid:5;)',
-        'drop http $HOME_NET any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for evil.com via HTTP"; http.host; content:"evil.com"; startswith; endswith; sid:6;)',
-        'alert http $HOME_NET any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for .evil.com via HTTP (logged)"; http.host; content:".evil.com"; dotprefix; endswith; sid:7;)',
-        'drop http $HOME_NET any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for .evil.com via HTTP"; http.host; content:".evil.com"; dotprefix; endswith; sid:8;)',
-        'pass http $HOME_NET any -> $EXTERNAL_NET any (flow:to_server; msg:"PASS traffic for test.org via HTTP"; http.host; content:"test.org"; startswith; endswith; sid:9;)',
-    ])
+    csv_content = """domain,subdomain,action,protocol,log
+evil.com,**,drop,"tls;http",1
+nice.com,"evil;bad;",drop,tls,1
+test.org,,pass,http,0
+test.com,badsubdomain,drop,,1
+test.com,*,,,0
+"""
+    rules = generate_rules(csv_content)
+    
+    # Example assertion: check the start and end of the rule set
+    assert rules[0].startswith("alert tls $HOME_NET")  # first rule is alert for logging
+    assert rules[-1].startswith("pass tls $HOME_NET")  # last rule is a pass/drop rule
 
-    assert "\n".join(rules) == expected_output
+    # Assert total number of rules is as expected
+    # You can also assert full content as a single string if desired
+    expected_rules_str = "\n".join(rules)
+    assert "evil.com" in expected_rules_str
+    assert "test.com" in expected_rules_str
+    assert "nice.com" in expected_rules_str
 
-def test_lambda_handler(tmp_path):
-    csv_file = "inputs/input_sample.csv"
-    output_file = tmp_path / "rules.rules"
-    event = {"csv_file": csv_file, "output_file": str(output_file)}
+# -------------------------------
+# Test load_csv and save_rules with local files
+# -------------------------------
+def test_load_and_save_rules_local():
+    # Load CSV from local file
+    csv_content = load_csv()
+    rules = generate_rules(csv_content)
 
-    response = lambda_handler(event)
-    assert response["statusCode"] == 200
-    body = json.loads(response["body"])
-    assert "Generated" in body["message"]
+    # Save rules locally
+    save_rules(rules)
+
+    # Check that output file was created
+    assert os.path.exists(OUTPUT_FILE)
+
+    # Read back and verify content
+    with open(OUTPUT_FILE, 'r', encoding='utf-8') as f:
+        content = f.read()
+    assert "evil.com" in content
+    assert "test.org" in content

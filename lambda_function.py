@@ -1,34 +1,39 @@
+import os
 import csv
-import json
-from pathlib import Path
-
-VALID_PROTOCOLS = {'dns', 'tls', 'http', 'smtp', 'ftp', 'tcp', 'udp'}
+import boto3
+from io import StringIO
 
 def parse_csv(csv_file):
-    with open(csv_file, newline='', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        return list(reader)
+    reader = csv.DictReader(StringIO(csv_file))
+    return [row for row in reader]
 
 
 def normalize_protocols(protocols_input):
-    if not protocols_input:
-        return ['tls']
-    protocols = [p.strip().lower() for p in protocols_input.replace(',', ';').split(';') if p.strip()]
-    valid = [p for p in protocols if p in VALID_PROTOCOLS]
-    return valid or ['tls']
+    protocols = [p.strip() for p in protocols_input.replace(',', ';').split(';') if p.strip()]
+    valid_protocols = {'dns', 'tls', 'http', 'smtp', 'ftp', 'tcp', 'udp'}
+    protocols = [p for p in protocols if p in valid_protocols]
+    return list(dict.fromkeys(protocols)) or ['tls']
 
 
 def normalize_subdomains(subdomains_input):
-    if not subdomains_input:
-        return ['']
-    subdomains = [s.strip().lower() for s in subdomains_input.replace(',', ';').split(';') if s.strip()]
-    if '**' in subdomains:
+    subdomains = [s.strip() for s in subdomains_input.replace(',', ';').split(';') if s.strip()]
+    if not subdomains:
+        subdomains = ['']
+    elif '**' in subdomains:
         subdomains = ['', '*']
-    return list(dict.fromkeys(subdomains)) or ['']
+    return list(dict.fromkeys(subdomains))
 
+def build_content_rule(protocol, domain, sub):
+    if sub == '':
+        extra = 'startswith; endswith;'
+        fqdn = domain
+    elif sub == '*':
+        extra = 'dotprefix; endswith;'
+        fqdn = f".{domain}"
+    else:
+        extra = 'startswith; endswith;'
+        fqdn = f"{sub}.{domain}"
 
-def build_content_rule(protocol, fqdn, wildcard=False):
-    extra = 'dotprefix; endswith;' if wildcard else 'startswith; endswith;'
     if protocol == 'dns':
         return f'dns.query; content:"{fqdn}"; {extra} nocase;'
     elif protocol == 'tls':
@@ -38,89 +43,83 @@ def build_content_rule(protocol, fqdn, wildcard=False):
     else:
         return f'content:"{fqdn}"; {extra} nocase;'
 
-
-def generate_rules(rows):
+def generate_rules(csv_content):
     sid = 1
     rules = []
+    rows = parse_csv(csv_content)
 
     for row in rows:
-        domain = row.get('domain', '').strip()
-        if not domain:
-            print("Skipping row with no domain.")
-            continue
-
+        domain = row['domain'].strip()
+        subdomains_input = (row.get('subdomain') or '').strip().lower()
         action = (row.get('action', 'pass')).strip().lower()
-        if action not in ('pass', 'drop'):
-            print(f"{domain}: invalid action '{action}', defaulting to pass")
-            action = 'pass'
-
         log_flag = (row.get('log', '1')).strip()
+        protocols_input = (row.get('protocol', 'tls')).strip().lower()
+
+        if not domain:
+            continue
+        if action not in ('pass', 'drop'):
+            action = 'pass'
         if log_flag not in ('0', '1'):
-            print(f"Invalid log flag '{log_flag}' for domain {domain}, defaulting to 1")
             log_flag = '1'
 
-        protocols = normalize_protocols(row.get('protocol', 'tls'))
-        subdomains = normalize_subdomains(row.get('subdomain'))
+        protocols = normalize_protocols(protocols_input)
+        subdomains = normalize_subdomains(subdomains_input)
 
         for protocol in protocols:
             for sub in subdomains:
-                wildcard = sub == '*'
-                fqdn = f".{domain}" if wildcard else (f"{sub}.{domain}" if sub else domain)
-                content_rule = build_content_rule(protocol, fqdn, wildcard)
+                content_rule = build_content_rule(protocol, domain, sub)
                 flow_rule = 'flow:to_server;'
 
                 if log_flag == '1':
-                    rules.append(
+                    alert_rule = (
                         f'alert {protocol} $HOME_NET any -> $EXTERNAL_NET any '
-                        f'({flow_rule} msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()} (logged)"; '
+                        f'({flow_rule} msg:"{action.upper()} traffic for {domain} via {protocol.upper()} (logged)"; '
                         f'{content_rule} sid:{sid};)'
                     )
+                    rules.append(alert_rule)
                     sid += 1
 
-                rules.append(
+                rule = (
                     f'{action} {protocol} $HOME_NET any -> $EXTERNAL_NET any '
-                    f'({flow_rule} msg:"{action.upper()} traffic for {fqdn} via {protocol.upper()}"; '
+                    f'({flow_rule} msg:"{action.upper()} traffic for {domain} via {protocol.upper()}"; '
                     f'{content_rule} sid:{sid};)'
                 )
+                rules.append(rule)
                 sid += 1
 
     return rules
 
+def load_csv():
+    bucket = os.environ.get("RULES_BUCKET")
+    if bucket:
+        # Lambda: read from S3
+        s3 = boto3.client("s3")
+        input_key = "input/input_sample.csv"
+        obj = s3.get_object(Bucket=bucket, Key=input_key)
+        return obj["Body"].read().decode("utf-8")
+    else:
+        # Local: read from file
+        input_file = os.path.join("tests", "inputs", "input_sample.csv")
+        with open(input_file, 'r', encoding='utf-8') as f:
+            return f.read()
 
-def save_rules(rules, output_file):
-    Path(output_file).parent.mkdir(parents=True, exist_ok=True)
-    with open(output_file, 'w', encoding='utf-8') as f:
-        f.write('\n'.join(rules))
-    print(f"Generated {len(rules)} rules -> {output_file}")
-
-
-def generate_suricata_rules(csv_file, output_file="outputs/suricata.rules"):
-    rows = parse_csv(csv_file)
-    rules = generate_rules(rows)
-    save_rules(rules, output_file)
-    return rules
+def save_rules(rules, output_file=None):
+    content = "\n".join(rules)
+    bucket = os.environ.get("RULES_BUCKET")
+    if bucket:
+        # Lambda: write to S3
+        s3 = boto3.client("s3")
+        output_key = "output/suricata.rules"
+        s3.put_object(Bucket=bucket, Key=output_key, Body=content.encode("utf-8"))
+    else:
+        # Local: write to file
+        output_file = os.path.join("tests", "outputs", "suricata.rules")
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(content)
 
 def lambda_handler(event=None, context=None):
-    csv_file = event.get("csv_file", "inputs/input_sample.csv") if event else "inputs/input_sample.csv"
-    output_file = event.get("output_file", "outputs/suricata.rules") if event else "outputs/suricata.rules"
-
-    try:
-        rules = generate_suricata_rules(csv_file, output_file)
-        return {
-            "statusCode": 200,
-            "body": json.dumps({
-                "message": f"Generated {len(rules)} rules successfully.",
-                "output_file": output_file
-            })
-        }
-    except Exception as e:
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": str(e)})
-        }
-
-
-def main():
-    generate_suricata_rules("inputs/input_sample.csv")
-
-main()
+    csv_content = load_csv()
+    rules = generate_rules(csv_content)
+    save_rules(rules)
+    return {"rules_generated": len(rules)}
