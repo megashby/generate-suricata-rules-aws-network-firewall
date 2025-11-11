@@ -103,7 +103,7 @@ def load_csv():
         with open(input_file, 'r', encoding='utf-8') as f:
             return f.read()
 
-def save_rules(rules, output_file=None):
+def save_rules_to_s3(rules, output_file=None):
     content = "\n".join(rules)
     bucket = os.environ.get("RULES_BUCKET")
     if bucket:
@@ -112,14 +112,11 @@ def save_rules(rules, output_file=None):
         output_key = "output/suricata.rules"
         s3.put_object(Bucket=bucket, Key=output_key, Body=content.encode("utf-8"))
     else:
-        # Local: write to file
-        output_file = os.path.join("tests", "outputs", "suricata.rules")
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
-        with open(output_file, 'w', encoding='utf-8') as f:
-            f.write(content)
+        print('No output bucket configured!')
+
 
 def lambda_handler(event=None, context=None):
     csv_content = load_csv()
     rules = generate_rules(csv_content)
-    save_rules(rules)
+    save_rules_to_s3(rules)
     return {"rules_generated": len(rules)}
