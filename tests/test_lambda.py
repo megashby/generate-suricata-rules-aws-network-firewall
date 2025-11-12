@@ -41,3 +41,26 @@ def test_generate_rules_basic():
         print(f"Expected : {expected_output[i]}")
         assert rules[i] == expected_output[i]
     
+def test_generate_rules_custom_vpc(monkeypatch):
+    mock_cidr = "10.0.0.0/16"
+    monkeypatch.setattr("lambda_function.get_vpc_cidr", lambda vpc_id: mock_cidr)
+    input_path = os.path.join(INPUT_DIR, "input_sample_vpc.csv")
+    output_path = os.path.join(OUTPUT_DIR, "output_sample_vpc.txt")
+
+    with open(input_path, "r", encoding="utf-8") as f:
+        lines = f.read()
+
+    with open(output_path, "r") as f:
+        expected_output = f.read().splitlines()
+
+    rules = generate_rules(lines)
+    
+    assert isinstance(rules, list)
+    assert len(rules) > 0, "No rules were generated!"
+    assert len(rules) == len(expected_output), "Mismatch in number of generated rules"
+
+    for i in range(len(rules)):
+        print(f"Generated: {rules[i]}")
+        print(f"Expected : {expected_output[i]}")
+        assert rules[i] == expected_output[i]
+        

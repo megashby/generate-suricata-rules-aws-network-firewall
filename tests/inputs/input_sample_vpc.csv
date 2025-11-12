@@ -1,0 +1,2 @@
+domain,subdomain,action,protocol,log,source_vpc
+evil.com,**,drop,"tls;http",1,vpc-111111
