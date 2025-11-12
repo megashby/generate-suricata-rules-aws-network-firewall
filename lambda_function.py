@@ -2,6 +2,18 @@ import os
 import csv
 import boto3
 from io import StringIO
+from botocore.exceptions import BotoCoreError, ClientError
+
+def get_vpc_cidr(vpc_id):
+    try:
+        ec2 = boto3.client("ec2")
+        response = ec2.describe_vpcs(VpcIds=[vpc_id])
+        vpcs = response.get("Vpcs", [])
+        if vpcs and "CidrBlock" in vpcs[0]:
+            return vpcs[0]["CidrBlock"]
+    except (BotoCoreError, ClientError, KeyError, IndexError) as e:
+        print(f"Warning: could not fetch CIDR for {vpc_id}: {e}")
+    return None
 
 def parse_csv(csv_file):
     reader = csv.DictReader(StringIO(csv_file))
@@ -54,6 +66,7 @@ def generate_rules(csv_content):
         action = (row.get('action', 'pass')).strip().lower()
         log_flag = (row.get('log', '1')).strip()
         protocols_input = (row.get('protocol', 'tls')).strip().lower()
+        source_vpc = (row.get('source_vpc') or '').strip()
 
         if not domain:
             continue
@@ -62,8 +75,15 @@ def generate_rules(csv_content):
         if log_flag not in ('0', '1'):
             log_flag = '1'
 
+        if source_vpc:
+            vpc_cidr = get_vpc_cidr(source_vpc)
+            src_net = vpc_cidr or "$HOME_NET"
+        else:
+            src_net = "$HOME_NET"    
+
         protocols = normalize_protocols(protocols_input)
         subdomains = normalize_subdomains(subdomains_input)
+        
 
         for protocol in protocols:
             for sub in subdomains:
@@ -72,7 +92,7 @@ def generate_rules(csv_content):
 
                 if log_flag == '1':
                     alert_rule = (
-                        f'alert {protocol} $HOME_NET any -> $EXTERNAL_NET any '
+                        f'alert {protocol} {src_net} any -> $EXTERNAL_NET any '
                         f'({flow_rule} msg:"{action.upper()} traffic for {domain} via {protocol.upper()} (logged)"; '
                         f'{content_rule} sid:{sid};)'
                     )
@@ -80,7 +100,7 @@ def generate_rules(csv_content):
                     sid += 1
 
                 rule = (
-                    f'{action} {protocol} $HOME_NET any -> $EXTERNAL_NET any '
+                    f'{action} {protocol} {src_net} any -> $EXTERNAL_NET any '
                     f'({flow_rule} msg:"{action.upper()} traffic for {domain} via {protocol.upper()}"; '
                     f'{content_rule} sid:{sid};)'
                 )
@@ -97,11 +117,6 @@ def load_csv():
         input_key = "input/input_sample.csv"
         obj = s3.get_object(Bucket=bucket, Key=input_key)
         return obj["Body"].read().decode("utf-8")
-    else:
-        # Local: read from file
-        input_file = os.path.join("tests", "inputs", "input_sample.csv")
-        with open(input_file, 'r', encoding='utf-8') as f:
-            return f.read()
 
 def save_rules_to_s3(rules, output_file=None):
     content = "\n".join(rules)
