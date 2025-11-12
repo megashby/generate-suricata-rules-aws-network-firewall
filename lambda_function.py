@@ -19,6 +19,32 @@ def parse_csv(csv_file):
     reader = csv.DictReader(StringIO(csv_file))
     return [row for row in reader]
 
+def normalize_source(source_vpc_input):
+    src_net = "$HOME_NET"
+    if not source_vpc_input:
+        return src_net
+
+    # Split on commas or semicolons
+    vpc_ids = [
+        v.strip()
+        for v in source_vpc_input.replace(",", ";").split(";")
+        if v.strip()
+    ]
+    if not vpc_ids:
+        return src_net
+
+    cidr_blocks = []
+    for vpc_id in vpc_ids:
+        cidr = get_vpc_cidr(vpc_id)
+        if cidr:
+            cidr_blocks.append(cidr)
+
+    if cidr_blocks:
+        # Suricata-style CIDR list with spaces
+        return "[" + ", ".join(cidr_blocks) + "]" if len(cidr_blocks) > 1 else cidr_blocks[0]
+    
+    return src_net 
+
 
 def normalize_protocols(protocols_input):
     protocols = [p.strip() for p in protocols_input.replace(',', ';').split(';') if p.strip()]
@@ -75,16 +101,10 @@ def generate_rules(csv_content):
         if log_flag not in ('0', '1'):
             log_flag = '1'
 
-        if source_vpc:
-            vpc_cidr = get_vpc_cidr(source_vpc)
-            src_net = vpc_cidr or "$HOME_NET"
-        else:
-            src_net = "$HOME_NET"    
-
+        src_net = normalize_source(source_vpc)
         protocols = normalize_protocols(protocols_input)
         subdomains = normalize_subdomains(subdomains_input)
         
-
         for protocol in protocols:
             for sub in subdomains:
                 content_rule = build_content_rule(protocol, domain, sub)
