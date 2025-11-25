@@ -57,15 +57,12 @@ def normalize_subdomains(subdomains_input):
     subdomains = [s.strip() for s in subdomains_input.replace(',', ';').split(';') if s.strip()]
     if not subdomains:
         subdomains = ['']
-    # elif '**' in subdomains:
-    #     subdomains = ['', '*']
     return list(dict.fromkeys(subdomains))
 
 def build_content_rule(protocol, domain, sub):
     """
     Build the Suricata rule content section, with PCRE when sub == '*'.
     """
-
 
     if sub == '*':
         # PCRE: require at least one label before the domain
