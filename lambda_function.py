@@ -57,8 +57,6 @@ def normalize_subdomains(subdomains_input):
     subdomains = [s.strip() for s in subdomains_input.replace(',', ';').split(';') if s.strip()]
     if not subdomains:
         subdomains = ['']
-    elif '**' in subdomains:
-        subdomains = ['', '*']
     return list(dict.fromkeys(subdomains))
 
 def build_content_rule(protocol, domain, sub):
@@ -66,7 +64,6 @@ def build_content_rule(protocol, domain, sub):
     Build the Suricata rule content section, with PCRE when sub == '*'.
     """
 
-    # Case 1: Only subdomains ("*")
     if sub == '*':
         # PCRE: require at least one label before the domain
         # Matches:  something.domain.com
@@ -82,7 +79,19 @@ def build_content_rule(protocol, domain, sub):
         else:
             return pcre
 
-    # Case 2: exact match only ("")
+    if sub == "**":
+        fqdn = domain
+        prefix = "dotprefix;"
+        suffix = "endswith;"
+
+        if protocol == 'dns':
+            return f'dns.query; {prefix} content:"{fqdn}"; {suffix} nocase;'
+        elif protocol == 'tls':
+            return f'tls.sni; {prefix} content:"{fqdn}"; {suffix} nocase;'
+        elif protocol == 'http':
+            return f'http.host; {prefix} content:"{fqdn}"; {suffix}'
+
+
     if sub == '':
         fqdn = domain
         extra = 'startswith; endswith;'
@@ -95,7 +104,7 @@ def build_content_rule(protocol, domain, sub):
         else:
             return f'content:"{fqdn}"; {extra} nocase;'
 
-    # Case 3: explicit subdomain like "www"
+
     fqdn = f"{sub}.{domain}"
     extra = 'startswith; endswith;'
 
