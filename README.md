@@ -1,13 +1,14 @@
 # generate-suricata-rules-aws-network-firewall
-
 Generate Suricata-style rules suitable for ingestion into AWS Network Firewall from a simple CSV of domains and options. The project includes a small Lambda-compatible handler (`lambda_handler`) that reads input from S3 and writes generated rules back to S3.
 
+This project was developed as part of the AWS re:Invent session **DEV206 - Automating Suricata rules for AWS Network Firewall**.
+
 **Quick summary:**
-- Input: CSV rows describing domains, optional subdomains, protocols and options.
+- Input: CSV rows describing domains, optional subdomains, protocols and logging options.
 - Output: Suricata rules (alerts and actions) emitted as plain text.
 
 **Features**
-- Support for multiple protocols (tls, dns, http, tcp, udp, etc.)
+- Support for multiple protocols (tls, dns, http)
 - Optional lookup of VPC CIDRs via AWS EC2 API (for `source_vpc` values)
 - Flexible subdomain matching (exact, wildcard, PCRE for single-label subdomains)
 - Lambda handler that reads/writes from S3 when `RULES_BUCKET` is set
@@ -26,7 +27,7 @@ The CSV must include at least a `domain` column. Other supported columns (option
 	- `*` — match single-label subdomains (PCRE used to require a label before the domain)
 	- `**` — match any subdomain or the domain (uses startswith/endswith)
 	- a specific label like `www` or `api` (can be a comma/semicolon-separated list)
-- `protocol` (optional): comma/semicolon-separated list. Valid values: `dns`, `tls`, `http`, `smtp`, `ftp`, `tcp`, `udp`. Defaults to `tls`.
+- `protocol` (optional): comma/semicolon-separated list. Valid values: `dns`, `tls`, `http`. Defaults to `tls`.
 - `action` (optional): `pass` or `drop` (defaults to `pass`)
 - `log` (optional): `1` to generate a logging `alert` rule plus the action rule, `0` to disable the alert (defaults to `1`)
 - `source_vpc` (optional): one or more VPC IDs (comma/semicolon-separated). If provided, the generator will attempt to resolve VPC CIDRs via the EC2 `describe_vpcs` API. If resolution fails, `$HOME_NET` is used.
@@ -58,13 +59,3 @@ There are example input CSVs under `inputs/` used by the tests.
 When running in Lambda (or locally with AWS credentials), the code will call:
 - `ec2:DescribeVpcs` (if resolving `source_vpc` values)
 - `s3:GetObject` and `s3:PutObject` (if `RULES_BUCKET` is set and S3 I/O is used)
-
-If you do not set `RULES_BUCKET` and call `lambda_handler`, the current implementation will not read input or write output (it expects S3 in Lambda). For local generation use `generate_rules()` directly with CSV text.
-
-**Contributing / Next steps**
-- Add a small CLI wrapper to read a file path and write output directly (convenience for local workflows).
-- Add `requirements.txt` or `pyproject.toml` for reproducible installs.
-- Support specifying S3 input/output keys via environment variables or handler event payloads.
-
-**License**
-This repository does not include a license file. Add a `LICENSE` if you intend to publish or share.
