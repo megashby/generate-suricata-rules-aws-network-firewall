@@ -169,12 +169,15 @@ def generate_rules(csv_content):
 
 def load_csv():
     bucket = os.environ.get("RULES_BUCKET")
-    if bucket:
-        # Lambda: read from S3
-        s3 = boto3.client("s3")
-        input_key = "input/input_sample.csv"
-        obj = s3.get_object(Bucket=bucket, Key=input_key)
-        return obj["Body"].read().decode("utf-8")
+    if not bucket:
+        raise RuntimeError('No RULES_BUCKET configured; load_csv requires S3')
+
+    # Lambda: read from S3
+    s3 = boto3.client("s3")
+    # allow the input S3 key to be configured via env var
+    input_key = os.environ.get("INPUT_KEY", "input/input_sample.csv")
+    obj = s3.get_object(Bucket=bucket, Key=input_key)
+    return obj["Body"].read().decode("utf-8")
 
 def save_rules_to_s3(rules, output_file=None):
     content = "\n".join(rules)
@@ -182,10 +185,12 @@ def save_rules_to_s3(rules, output_file=None):
     if bucket:
         # Lambda: write to S3
         s3 = boto3.client("s3")
-        output_key = "output/suricata.rules"
+        # allow the output S3 key to be configured via env var
+        output_key = os.environ.get("OUTPUT_KEY", "output/suricata.rules")
         s3.put_object(Bucket=bucket, Key=output_key, Body=content.encode("utf-8"))
     else:
-        print('No output bucket configured!')
+        # No S3 bucket configured — this function requires S3.
+        raise RuntimeError('No RULES_BUCKET configured; save_rules_to_s3 requires S3')
 
 
 def lambda_handler(event=None, context=None):
