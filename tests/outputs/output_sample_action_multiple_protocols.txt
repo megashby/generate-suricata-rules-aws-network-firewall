@@ -1,2 +1,2 @@
-drop tls [10.0.0.0/16, 10.2.0.0/16] any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for evil.com via TLS"; tls.sni; dotprefix; content:"evil.com"; endswith; nocase; sid:1;)
-drop http [10.0.0.0/16, 10.2.0.0/16] any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for evil.com via HTTP"; http.host; dotprefix; content:"evil.com"; endswith; sid:2;)
+drop tls [10.0.0.0/16, 10.2.0.0/16] any -> $EXTERNAL_NET any (flow:to_server; tls.sni; dotprefix; content:"evil.com"; endswith; nocase; sid:1;)
+drop http [10.0.0.0/16, 10.2.0.0/16] any -> $EXTERNAL_NET any (flow:to_server; http.host; dotprefix; content:"evil.com"; endswith; sid:2;)

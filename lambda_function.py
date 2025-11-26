@@ -159,7 +159,7 @@ def generate_rules(csv_content):
 
                 rule = (
                     f'{action} {protocol} {src_net} any -> $EXTERNAL_NET any '
-                    f'({flow_rule} msg:"{action.upper()} traffic for {domain} via {protocol.upper()}"; '
+                    f'({flow_rule} '
                     f'{content_rule} sid:{sid};)'
                 )
                 rules.append(rule)
