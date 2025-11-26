@@ -47,4 +47,3 @@ venv.bak/
 *.sublime-workspace
 .DS_Store
 Thumbs.db
-outputs/

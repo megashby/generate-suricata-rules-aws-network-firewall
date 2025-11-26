@@ -125,3 +125,58 @@ def test_normalize_source_multiple_vpcs(monkeypatch):
 
     result = normalize_source("")
     assert result == "$HOME_NET"
+
+
+def test_generate_rules_action(monkeypatch):
+    """Test a single drop rule with a resolved VPC CIDR and logging enabled."""
+    mock_cidr = "10.0.0.0/16"
+    monkeypatch.setattr("lambda_function.get_vpc_cidr", lambda vpc_id: mock_cidr)
+
+    input_path = os.path.join(INPUT_DIR, "input_sample_action.csv")
+    output_path = os.path.join(OUTPUT_DIR, "output_sample_action.txt")
+
+    with open(input_path, "r", encoding="utf-8") as f:
+        lines = f.read()
+
+    with open(output_path, "r") as f:
+        expected_output = f.read().splitlines()
+
+    rules = generate_rules(lines)
+
+    assert isinstance(rules, list)
+    assert len(rules) > 0, "No rules were generated!"
+    assert len(rules) == len(expected_output), "Mismatch in number of generated rules"
+
+    for i in range(len(rules)):
+        print(f"Generated: {rules[i]}")
+        print(f"Expected : {expected_output[i]}")
+        assert rules[i] == expected_output[i]
+
+
+def test_generate_rules_action_multiple_protocols():
+    """Test a drop rule spanning multiple protocols with multiple VPCs (no logging)."""
+    vpc_to_cidr = {
+        "vpc-111111": "10.0.0.0/16",
+        "vpc-222222": "10.2.0.0/16",
+    }
+
+    input_path = os.path.join(INPUT_DIR, "input_sample_action_multiple_protocols.csv")
+    output_path = os.path.join(OUTPUT_DIR, "output_sample_action_multiple_protocols.txt")
+    with open(input_path, "r", encoding="utf-8") as f:
+        lines = f.read()
+
+    with open(output_path, "r") as f:
+        expected_output = f.read().splitlines()
+
+    with patch("lambda_function.get_vpc_cidr") as mock_get_cidr:
+        mock_get_cidr.side_effect = lambda vpc_id: vpc_to_cidr.get(vpc_id, None)
+        rules = generate_rules(lines)
+
+    assert isinstance(rules, list)
+    assert len(rules) > 0, "No rules were generated!"
+    assert len(rules) == len(expected_output), "Mismatch in number of generated rules"
+
+    for i in range(len(rules)):
+        print(f"Generated: {rules[i]}")
+        print(f"Expected : {expected_output[i]}")
+        assert rules[i] == expected_output[i]
