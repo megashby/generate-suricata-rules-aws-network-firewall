@@ -42,7 +42,10 @@ example.com,*,tls,pass,1,vpc-0123456789abcdef0
 **Usage — AWS Lambda**
 
 1. Deploy the Lambda with `lambda_function.lambda_handler` as the handler.
-2. Set environment variable `RULES_BUCKET` to the S3 bucket that contains `input/input_sample.csv` (or change `load_csv` to read a different key).
+2. Set environment variable `RULES_BUCKET` to the S3 bucket that contains your input CSV. You can configure the S3 keys with environment variables:
+
+- `INPUT_KEY` — S3 key for the input CSV (default: `input/input_sample.csv`)
+- `OUTPUT_KEY` — S3 key for the output rules file (default: `output/suricata.rules`)
 3. The handler reads `input/input_sample.csv` from S3 and writes `output/suricata.rules` back to the same bucket.
 
 **Testing**
@@ -56,6 +59,6 @@ pytest -q
 There are example input CSVs under `inputs/` used by the tests.
 
 **Environment / AWS permissions**
-When running in Lambda (or locally with AWS credentials), the code will call:
+When running in Lambda the code will call:
 - `ec2:DescribeVpcs` (if resolving `source_vpc` values)
-- `s3:GetObject` and `s3:PutObject` (if `RULES_BUCKET` is set and S3 I/O is used)
+- `s3:GetObject` and `s3:PutObject` (requires `RULES_BUCKET` to be set)
