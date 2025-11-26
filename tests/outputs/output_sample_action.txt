@@ -1,0 +1,2 @@
+alert tls 10.0.0.0/16 any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for nice.com via TLS (logged)"; tls.sni; content:"bad.nice.com"; startswith; endswith; nocase; sid:1;)
+drop tls 10.0.0.0/16 any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for nice.com via TLS"; tls.sni; content:"bad.nice.com"; startswith; endswith; nocase; sid:2;)
