@@ -68,7 +68,9 @@ def build_content_rule(protocol, domain, sub):
         # PCRE: require at least one label before the domain
         # Matches:  something.domain.com
         # Does NOT match: domain.com
-        pcre = fr'pcre:"/^[^.]+\.(?:[^.]+\.)*{domain.replace(".", r"\.")}$/i";'
+        # escape dots in the domain for use in the PCRE
+        escaped_domain = domain.replace('.', '\\.')
+        pcre = f'pcre:"/^[^.]+\.(?:[^.]+\.)*{escaped_domain}$/i";'
 
         if protocol == 'dns':
             return f'dns.query; {pcre}'
