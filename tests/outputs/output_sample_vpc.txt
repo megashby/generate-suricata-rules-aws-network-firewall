@@ -1,4 +1,4 @@
-alert tls 10.0.0.0/16 any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for evil.com via TLS (logged)"; tls.sni; dotprefix; content:"evil.com"; endswith; nocase; sid:1;)
+alert tls 10.0.0.0/16 any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for **.evil.com via TLS (logged)"; tls.sni; dotprefix; content:"evil.com"; endswith; nocase; sid:1;)
 drop tls 10.0.0.0/16 any -> $EXTERNAL_NET any (flow:to_server; tls.sni; dotprefix; content:"evil.com"; endswith; nocase; sid:2;)
-alert http 10.0.0.0/16 any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for evil.com via HTTP (logged)"; http.host; dotprefix; content:"evil.com"; endswith; sid:3;)
+alert http 10.0.0.0/16 any -> $EXTERNAL_NET any (flow:to_server; msg:"DROP traffic for **.evil.com via HTTP (logged)"; http.host; dotprefix; content:"evil.com"; endswith; sid:3;)
 drop http 10.0.0.0/16 any -> $EXTERNAL_NET any (flow:to_server; http.host; dotprefix; content:"evil.com"; endswith; sid:4;)

@@ -87,24 +87,24 @@ def test_generate_rules_multiple_vpc():
         print(f"Expected : {expected_output[i]}")
         assert rules[i] == expected_output[i]
 
-# def test_sample():
-#     vpc_to_cidr = {
-#         "vpc-111111": "10.0.0.0/16",
-#         "vpc-222222": "10.2.0.0/16",
-#     }
+def test_sample():
+    vpc_to_cidr = {
+        "vpc-111111": "10.0.0.0/16",
+        "vpc-222222": "10.2.0.0/16",
+    }
 
-#     input_path = os.path.join(INPUT_DIR, "input_sample.csv")
-#     with open(input_path, "r", encoding="utf-8") as f:
-#         lines = f.read()
+    input_path = os.path.join(INPUT_DIR, "input_sample.csv")
+    with open(input_path, "r", encoding="utf-8") as f:
+        lines = f.read()
 
-#     with patch("lambda_function.get_vpc_cidr") as mock_get_cidr:
-#         mock_get_cidr.side_effect = lambda vpc_id: vpc_to_cidr.get(vpc_id, None)
-#         rules = generate_rules(lines)
+    with patch("lambda_function.get_vpc_cidr") as mock_get_cidr:
+        mock_get_cidr.side_effect = lambda vpc_id: vpc_to_cidr.get(vpc_id, None)
+        rules = generate_rules(lines)
 
-#     assert isinstance(rules, list)
-#     assert len(rules) > 0, "No rules were generated!"
-#     print(rules)
-#     assert 1 == 2         
+    assert isinstance(rules, list)
+    assert len(rules) > 0, "No rules were generated!"
+    print(rules)
+    assert 1 == 2         
         
 def test_normalize_source_multiple_vpcs(monkeypatch):
     mock_cidrs = {

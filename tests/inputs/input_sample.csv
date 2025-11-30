@@ -1,2 +1,0 @@
-domain,subdomain,action,protocol,source_vpc,log
-nice.com,bad,drop,tls,vpc-111111,1
