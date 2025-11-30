@@ -149,9 +149,11 @@ def generate_rules(csv_content):
                 flow_rule = 'flow:to_server;'
 
                 if log_flag == '1':
+                    # include the subdomain in the logged message when present
+                    display_target = domain if not sub else f"{sub}.{domain}"
                     alert_rule = (
                         f'alert {protocol} {src_net} any -> $EXTERNAL_NET any '
-                        f'({flow_rule} msg:"{action.upper()} traffic for {domain} via {protocol.upper()} (logged)"; '
+                        f'({flow_rule} msg:"{action.upper()} traffic for {display_target} via {protocol.upper()} (logged)"; '
                         f'{content_rule} sid:{sid};)'
                     )
                     rules.append(alert_rule)

@@ -1,2 +1,3 @@
 domain,subdomain,action,protocol,log,source_vpc
 evil.com,**,drop,"tls;http",0,"vpc-111111;vpc-222222"
+alsoevil.com,*,drop,"tls;http",0,"vpc-111111;vpc-222222"
